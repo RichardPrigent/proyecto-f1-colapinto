@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\RaceScheduleService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
+use Exception;
 
 class RaceScheduleController extends Controller
 {
@@ -19,15 +20,20 @@ class RaceScheduleController extends Controller
     // Método que responderá a las solicitudes GET en la ruta /race-schedule
     public function index(): JsonResponse
     {
-        // Llama al servicio para obtener el calendario de carreras
-        $raceSchedule = $this->raceScheduleService->getRaceSchedule();
+        try {
+            // Llama al servicio para obtener el calendario de carreras
+            $raceSchedule = $this->raceScheduleService->getRaceSchedule();
 
-        if (isset($raceSchedule['error'])) {
-            // Retorna un mensaje de error en caso de que no se pueda obtener el calendario
-            return response()->json(['error' => $raceSchedule['error']], Response::HTTP_INTERNAL_SERVER_ERROR);
+            // Verifica si hay un error en la respuesta
+            if (isset($raceSchedule['error'])) {
+                return response()->json(['error' => $raceSchedule['error']], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            // Retorna la respuesta en formato JSON al cliente
+            return response()->json($raceSchedule, Response::HTTP_OK);
+        } catch (Exception $e) {
+            // Manejo de excepciones generales
+            return response()->json(['error' => 'Ocurrió un error al procesar la solicitud.'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-
-        // Retorna la respuesta en formato JSON al cliente
-        return response()->json($raceSchedule, Response::HTTP_OK);
     }
 }
