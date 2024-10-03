@@ -3,24 +3,38 @@
 namespace App\Services;
 
 use App\Contracts\HttpClientInterface;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Contracts\Routing\ResponseFactory;
 
 class RaceScheduleService
 {
     private string $apiUrl;
     private HttpClientInterface $httpClient;
+    private ResponseFactory $responseFactory;
 
-    // Constructor de la clase
-    public function __construct(HttpClientInterface $httpClient)
+    public function __construct(HttpClientInterface $httpClient, ResponseFactory $responseFactory)
     {
-        // Asigna la URL de la API desde el archivo de configuración .env
         $this->apiUrl = env('ERGAST_API_URL');
-        $this->httpClient = $httpClient; // Inyección del adaptador
+        $this->httpClient = $httpClient;
+        $this->responseFactory = $responseFactory; // Inyecta la fábrica de respuestas
     }
 
-    // Método para obtener el calendario de carreras
-    public function getRaceSchedule(): array
+    public function getRaceSchedule(): JsonResponse
     {
-        // Llamada al método del adaptador que realiza la petición HTTP
-        return $this->httpClient->get($this->apiUrl);
+        try {
+            $response = $this->httpClient->get(env('ERGAST_API_URL'));
+
+            // Verifica que la respuesta no sea nula
+            if ($response && $response->getStatusCode() === 200) {
+                return $response; // Asegúrate de que esto también sea un JsonResponse
+            }
+
+            // Manejar el caso de respuesta nula
+            $error = ['error' => 'Error inesperado: HTTP request returned null response.'];
+            return $this->responseFactory->json($error, 500);
+        } catch (\Exception $e) {
+            $error = ['error' => 'Excepción capturada: ' . $e->getMessage()];
+            return $this->responseFactory->json($error, 500); // Asegúrate de que aquí también se devuelve un JsonResponse
+        }
     }
 }
