@@ -2,55 +2,85 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use App\Services\RaceScheduleService;
 use App\Http\Controllers\RaceScheduleController;
+use App\Services\RaceScheduleService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Exceptions\HttpResponseException;
+use Tests\TestCase;
 use Mockery;
-use Exception;
 
 class RaceScheduleControllerTest extends TestCase
 {
-    public function testIndexReturnsRaceSchedule()
+    // Test para verificar que el método index devuelve el cronograma de carreras correctamente
+    public function testIndexReturnsRaceScheduleSuccessfully()
     {
-        /** @var RaceScheduleService|Mockery\MockInterface $raceScheduleServiceMock */
-        $raceScheduleServiceMock = Mockery::mock(RaceScheduleService::class);
-        $raceScheduleServiceMock->shouldReceive('getRaceSchedule')
+        // Crear un mock del servicio RaceScheduleService
+        $mockRaceScheduleService = Mockery::mock(RaceScheduleService::class);
+        $mockRaceScheduleService->shouldReceive('getRaceSchedule')
             ->once()
-            ->andReturn(new JsonResponse(['schedule' => 'race data'], 200));
+            ->andReturn(['race1', 'race2']);
 
-        // Instantiate the controller with the mocked service
-        $controller = new RaceScheduleController($raceScheduleServiceMock);
+        // Crear una instancia del controlador con el servicio mockeado
+        $controller = new RaceScheduleController($mockRaceScheduleService instanceof RaceScheduleService ? $mockRaceScheduleService : null);
 
-        // Call the index method
+        // Llamar al método index del controlador
         $response = $controller->index();
 
-        // Assert the response
+        // Verificar que la respuesta sea una instancia de JsonResponse
         $this->assertInstanceOf(JsonResponse::class, $response);
-        $this->assertEquals(200, $response->getStatusCode());
-        $this->assertEquals(['schedule' => 'race data'], $response->getData(true));
+        // Verificar que el código de estado sea HTTP_OK
+        $this->assertEquals(JsonResponse::HTTP_OK, $response->getStatusCode());
+        // Verificar que los datos de la respuesta sean los esperados
+        $this->assertEquals(['race1', 'race2'], $response->getData(true));
     }
 
-    public function testIndexHandlesException()
+    // Test para verificar que el método index maneja correctamente una HttpResponseException
+    public function testIndexHandlesHttpResponseException()
     {
-        /** @var RaceScheduleService|Mockery\MockInterface $raceScheduleServiceMock */
-        $raceScheduleServiceMock = Mockery::mock(RaceScheduleService::class);
-        $raceScheduleServiceMock->shouldReceive('getRaceSchedule')
+        // Crear un mock del servicio RaceScheduleService
+        $mockService = Mockery::mock(RaceScheduleService::class);
+        $mockService->shouldReceive('getRaceSchedule')
             ->once()
-            ->andThrow(new Exception('Some error'));
+            ->andThrow(new HttpResponseException(response()->json(['error' => 'Ocurrió un error HTTP'], JsonResponse::HTTP_BAD_REQUEST)));
 
-        // Instantiate the controller with the mocked service
-        $controller = new RaceScheduleController($raceScheduleServiceMock);
+        // Crear una instancia del controlador con el servicio mockeado
+        $controller = new RaceScheduleController($mockService instanceof RaceScheduleService ? $mockService : null);
 
-        // Call the index method
+        // Llamar al método index del controlador
         $response = $controller->index();
 
-        // Assert the response
+        // Verificar que la respuesta sea una instancia de JsonResponse
         $this->assertInstanceOf(JsonResponse::class, $response);
-        $this->assertEquals(500, $response->getStatusCode());
-        $this->assertEquals(['error' => 'Ocurrió un error al procesar la solicitud.'], $response->getData(true));
+        // Verificar que el código de estado sea HTTP_BAD_REQUEST
+        $this->assertEquals(JsonResponse::HTTP_BAD_REQUEST, $response->getStatusCode());
+        // Verificar que los datos de la respuesta sean los esperados
+        $this->assertEquals(['error' => 'Ocurrió un error HTTP'], $response->getData(true));
     }
 
+    // Test para verificar que el método index maneja correctamente una excepción general
+    public function testIndexHandlesGeneralException()
+    {
+        // Crear un mock del servicio RaceScheduleService
+        $mockRaceScheduleService = Mockery::mock(RaceScheduleService::class);
+        $mockRaceScheduleService->shouldReceive('getRaceSchedule')
+            ->once()
+            ->andThrow(new \Exception('General error'));
+
+        // Crear una instancia del controlador con el servicio mockeado
+        $controller = new RaceScheduleController($mockRaceScheduleService instanceof RaceScheduleService ? $mockRaceScheduleService : null);
+
+        // Llamar al método index del controlador
+        $response = $controller->index();
+
+        // Verificar que la respuesta sea una instancia de JsonResponse
+        $this->assertInstanceOf(JsonResponse::class, $response);
+        // Verificar que el código de estado sea HTTP_INTERNAL_SERVER_ERROR
+        $this->assertEquals(JsonResponse::HTTP_INTERNAL_SERVER_ERROR, $response->getStatusCode());
+        // Verificar que los datos de la respuesta sean los esperados
+        $this->assertEquals(['error' => 'Ocurrió un error al procesar la solicitud: General error'], $response->getData(true));
+    }
+
+    // Método para cerrar Mockery después de cada test
     protected function tearDown(): void
     {
         Mockery::close();

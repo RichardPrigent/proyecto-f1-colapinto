@@ -1,79 +1,109 @@
 <?php
 
-use Mockery;
-use PHPUnit\Framework\TestCase;
-use App\Contracts\HttpClientInterface;
+namespace Tests\Unit;
+
 use App\Services\RaceScheduleService;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Contracts\Routing\ResponseFactory;
+use App\Contracts\HttpClientInterface;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Http\Exceptions\HttpResponseException;
+use Tests\TestCase;
+use Mockery;
 
 class RaceScheduleServiceTest extends TestCase
 {
-    // Método que se ejecuta después de cada test
+    protected function setUp(): void
+    {
+        parent::setUp();
+        putenv('ERGAST_API_URL=https://ergast.com/api/f1/current.json'); // Establecer la URL de la API
+        Cache::flush(); // Limpiar la caché antes de cada prueba
+    }
+
     protected function tearDown(): void
     {
-        Mockery::close();
+        Mockery::close(); // Cerrar Mockery después de cada prueba
         parent::tearDown();
     }
 
-    // Test para verificar que getRaceSchedule devuelve una respuesta JSON en caso de éxito
-    public function testGetRaceScheduleReturnsJsonResponseOnSuccess()
+    public function testGetRaceScheduleReturnsDataFromCache()
     {
-        /** @var HttpClientInterface|Mockery\MockInterface $mockHttpClient */
-        $mockHttpClient = Mockery::mock(HttpClientInterface::class);
-        /** @var ResponseFactory|Mockery\MockInterface $mockResponseFactory */
-        $mockResponseFactory = Mockery::mock(ResponseFactory::class);
-        $mockJsonResponse = Mockery::mock(JsonResponse::class);
+        $httpClientMock = Mockery::mock(HttpClientInterface::class);
+        $cacheData = ['race' => 'data'];
 
-        // Configuramos el mock para que devuelva una respuesta JSON al hacer una petición GET
-        $mockHttpClient->shouldReceive('get')
+        Cache::shouldReceive('remember')
             ->once()
-            ->with(env('ERGAST_API_URL'))
-            ->andReturn($mockJsonResponse);
+            ->with('race_schedule', 1800, Mockery::type('Closure'))
+            ->andReturn($cacheData); // Simular que los datos vienen de la caché
 
-        // Configuramos el mock para que la respuesta tenga un código de estado 200
-        $mockJsonResponse->shouldReceive('getStatusCode')
-            ->once()
-            ->andReturn(200);
+        $service = new RaceScheduleService($httpClientMock instanceof HttpClientInterface ? $httpClientMock : null);
+        $result = $service->getRaceSchedule();
 
-        // Creamos una instancia del servicio con los mocks
-        $service = new RaceScheduleService($mockHttpClient, $mockResponseFactory);
-        $response = $service->getRaceSchedule();
-
-        // Verificamos que la respuesta sea una instancia de JsonResponse
-        $this->assertInstanceOf(JsonResponse::class, $response);
-        // Verificamos que la respuesta sea igual a la respuesta mockeada
-        $this->assertEquals($mockJsonResponse, $response);
+        $this->assertEquals($cacheData, $result); // Verificar que los datos de la caché son correctos
     }
 
-    // Test para verificar que getRaceSchedule devuelve una respuesta de error JSON en caso de respuesta nula
-    public function testGetRaceScheduleReturnsErrorJsonResponseOnNullResponse()
+    public function testGetRaceScheduleFetchesDataFromApi()
     {
-        /** @var HttpClientInterface|Mockery\MockInterface $mockHttpClient */
-        $mockHttpClient = Mockery::mock(HttpClientInterface::class);
-        /** @var ResponseFactory|Mockery\MockInterface $mockResponseFactory */
-        $mockResponseFactory = Mockery::mock(ResponseFactory::class);
-        $mockErrorResponse = Mockery::mock(JsonResponse::class);
+        $httpClientMock = Mockery::mock(HttpClientInterface::class);
+        $apiResponse = Mockery::mock();
+        $apiData = ['race' => 'data'];
 
-        // Configuramos el mock para que devuelva null al hacer una petición GET
-        $mockHttpClient->shouldReceive('get')
+        $apiResponse->shouldReceive('successful')
             ->once()
-            ->with(env('ERGAST_API_URL'))
-            ->andReturn(null);
-
-        // Configuramos el mock para que devuelva una respuesta de error JSON
-        $mockResponseFactory->shouldReceive('json')
+            ->andReturn(true); // Simular que la respuesta de la API es exitosa
+        $apiResponse->shouldReceive('json')
             ->once()
-            ->with(['error' => 'Error inesperado: HTTP request returned null response.'], 500)
-            ->andReturn($mockErrorResponse);
+            ->andReturn($apiData); // Simular los datos de la API
 
-        // Creamos una instancia del servicio con los mocks
-        $service = new RaceScheduleService($mockHttpClient, $mockResponseFactory);
-        $response = $service->getRaceSchedule();
+        // Obtener la URL de la variable de entorno
+        $apiUrl = getenv('ERGAST_API_URL');
 
-        // Verificamos que la respuesta sea una instancia de JsonResponse
-        $this->assertInstanceOf(JsonResponse::class, $response);
-        // Verificamos que la respuesta sea igual a la respuesta de error mockeada
-        $this->assertEquals($mockErrorResponse, $response);
+        $httpClientMock->shouldReceive('get')
+            ->once()
+            ->with($apiUrl) // Usar la URL de la variable de entorno
+            ->andReturn($apiResponse); // Simular la llamada a la API
+
+        Cache::shouldReceive('remember')
+            ->once()
+            ->with('race_schedule', 1800, Mockery::type('Closure'))
+            ->andReturnUsing(function ($key, $ttl, $callback) {
+                return $callback(); // Ejecutar el callback para obtener los datos de la API
+            });
+
+        $service = new RaceScheduleService($httpClientMock instanceof HttpClientInterface ? $httpClientMock : null);
+        $result = $service->getRaceSchedule();
+
+        $this->assertEquals($apiData, $result); // Verificar que los datos de la API son correctos
+    }
+
+    public function testGetRaceScheduleThrowsExceptionOnApiError()
+    {
+        $this->expectException(HttpResponseException::class); // Esperar una excepción si la API falla
+
+        $httpClientMock = Mockery::mock(HttpClientInterface::class);
+        $apiResponse = Mockery::mock();
+
+        $apiResponse->shouldReceive('successful')
+            ->once()
+            ->andReturn(false); // Simular que la respuesta de la API no es exitosa
+        $apiResponse->shouldReceive('body')
+            ->once()
+            ->andReturn('Error message'); // Simular el mensaje de error de la API
+
+        // Obtener la URL de la variable de entorno
+        $apiUrl = getenv('ERGAST_API_URL');
+
+        $httpClientMock->shouldReceive('get')
+            ->once()
+            ->with($apiUrl) // Usar la URL de la variable de entorno
+            ->andReturn($apiResponse); // Simular la llamada a la API
+
+        Cache::shouldReceive('remember')
+            ->once()
+            ->with('race_schedule', 1800, Mockery::type('Closure'))
+            ->andReturnUsing(function ($key, $ttl, $callback) {
+                return $callback(); // Ejecutar el callback para obtener los datos de la API
+            });
+
+        $service = new RaceScheduleService($httpClientMock instanceof HttpClientInterface ? $httpClientMock : null);
+        $service->getRaceSchedule(); // Llamar al método que debería lanzar la excepción
     }
 }

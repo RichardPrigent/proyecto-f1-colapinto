@@ -3,54 +3,78 @@
 namespace Tests\Unit;
 
 use App\Adapters\HttpClientAdapter;
-use Illuminate\Support\Facades\Http;
-use Tests\TestCase;
+use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\Psr7\Request;
+use GuzzleHttp\Psr7\Response as GuzzleResponse;
+use Illuminate\Http\Client\Response as HttpClientResponse;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
+use Tests\TestCase;
 
 class HttpClientAdapterTest extends TestCase
 {
-    private const EXAMPLE_URL = 'https://example.com';
+    protected HttpClientAdapter $httpClient;
+    private const TEST_URL = 'https://api.example.com/data'; // Definición de la constante
 
-    public function testGetReturnsValidResponse()
+    protected function setUp(): void
     {
-        // Falsificar una respuesta HTTP exitosa
-        Http::fake([
-            self::EXAMPLE_URL => Http::response(['data' => 'success'], 200)
-        ]);
-
-        $client = new HttpClientAdapter();
-        $response = $client->get(self::EXAMPLE_URL);
-
-        // Asegurarse de que la respuesta es un JsonResponse y tiene el contenido esperado
-        $this->assertInstanceOf(JsonResponse::class, $response);
-        $this->assertEquals(200, $response->status());
-        $this->assertEquals(['data' => 'success'], $response->getData(true));
+        parent::setUp();
+        $this->httpClient = new HttpClientAdapter(); // Inicializa el adaptador de cliente HTTP
     }
 
-    public function testGetHandlesInvalidUrl()
+    public function testValidUrlReturnsResponse()
     {
-        $client = new HttpClientAdapter();
-        $response = $client->get('invalid-url');
+        Http::shouldReceive('retry')
+            ->once()
+            ->andReturnSelf(); // Simula el método retry de la fachada Http
+        Http::shouldReceive('get')
+            ->once()
+            ->with(self::TEST_URL)
+            ->andReturn(new HttpClientResponse(
+                new GuzzleResponse(JsonResponse::HTTP_OK, [], json_encode(['message' => 'Success'])) // Respuesta simulada con estado 200 y mensaje de éxito
+            ));
 
-        // Asegurarse de que maneja URLs no válidas
-        $this->assertInstanceOf(JsonResponse::class, $response);
-        $this->assertEquals(400, $response->status());
-        $this->assertEquals(['error' => 'URL no válida'], $response->getData(true));
+        $response = $this->httpClient->get(self::TEST_URL); // Realiza la solicitud GET
+        $this->assertEquals(JsonResponse::HTTP_OK, $response->status()); // Verifica que el estado de la respuesta sea 200
+        $this->assertEquals('Success', json_decode($response->body())->message); // Verifica que el mensaje de la respuesta sea "Success"
     }
 
-    public function testGetHandlesHttpRequestError()
+    public function testInvalidUrlThrowsValidationException()
     {
-        // Falsificar una respuesta con error
-        Http::fake([
-            self::EXAMPLE_URL => Http::response(null, 500)
-        ]);
+        $this->expectException(ValidationException::class); // Espera una excepción de validación
 
-        $client = new HttpClientAdapter();
-        $response = $client->get(self::EXAMPLE_URL);
+        $this->httpClient->get('invalid-url'); // Realiza la solicitud GET con una URL inválida
+    }
 
-        // Verificar que se maneja correctamente la respuesta con error
-        $this->assertInstanceOf(JsonResponse::class, $response);
-        $this->assertEquals(500, $response->status());
-        $this->assertEquals(['error' => 'Error inesperado: HTTP request returned status code 500'], $response->getData(true));
+    public function testRequestExceptionThrowsHttpResponseException()
+    {
+        Http::shouldReceive('retry')
+            ->once()
+            ->andReturnSelf(); // Simula el método retry de la fachada Http
+        Http::shouldReceive('get')
+            ->once()
+            ->with(self::TEST_URL)
+            ->andThrow(new RequestException("Error en la conexión", new Request('GET', self::TEST_URL))); // Simula una excepción de solicitud
+
+        $this->expectException(HttpResponseException::class); // Espera una excepción de respuesta HTTP
+        $this->httpClient->get(self::TEST_URL); // Realiza la solicitud GET
+    }
+
+    public function testUnsuccessfulResponseThrowsHttpResponseException()
+    {
+        Http::shouldReceive('retry')
+            ->once()
+            ->andReturnSelf(); // Simula el método retry de la fachada Http
+        Http::shouldReceive('get')
+            ->once()
+            ->with(self::TEST_URL)
+            ->andReturn(new HttpClientResponse(
+                new GuzzleResponse(JsonResponse::HTTP_NOT_FOUND, [], json_encode(['error' => 'Not Found'])) // Respuesta simulada con estado 404 y mensaje de error
+            ));
+
+        $this->expectException(HttpResponseException::class); // Espera una excepción de respuesta HTTP
+        $this->httpClient->get(self::TEST_URL); // Realiza la solicitud GET
     }
 }

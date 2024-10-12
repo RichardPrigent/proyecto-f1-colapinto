@@ -4,13 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Services\RaceScheduleService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Exception;
 
 /**
- * Clase RaceScheduleController
+ * RaceScheduleController
  *
- * Este controlador maneja las operaciones relacionadas con el calendario de carreras.
- * Extiende la clase base Controller proporcionada por el framework.
+ * Este controlador maneja las solicitudes relacionadas con el cronograma de carreras.
  *
  * @package App\Http\Controllers
  */
@@ -18,21 +18,30 @@ class RaceScheduleController extends Controller
 {
     private RaceScheduleService $raceScheduleService;
 
-    // Inyección del servicio en el constructor
     public function __construct(RaceScheduleService $raceScheduleService)
     {
         $this->raceScheduleService = $raceScheduleService;
     }
 
-    // Método que responderá a las solicitudes GET en la ruta /race-schedule
+    /**
+     * Muestra una lista del cronograma de carreras.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     *
+     * @throws \Illuminate\Http\Exceptions\HttpResponseException Si hay un error de respuesta HTTP.
+     * @throws \Exception Si hay un error general.
+     */
     public function index(): JsonResponse
     {
         try {
-            // Llama al servicio para obtener el calendario de carreras
-            return $this->raceScheduleService->getRaceSchedule(); // Asumiendo que devuelve un JsonResponse
+            $data = $this->raceScheduleService->getRaceSchedule();
+            return response()->json($data, JsonResponse::HTTP_OK);
+        } catch (HttpResponseException $e) {
+            // Manejo de excepciones específicas de respuesta HTTP
+            return response()->json(['error' => 'Ocurrió un error HTTP'], JsonResponse::HTTP_BAD_REQUEST);
         } catch (Exception $e) {
-            // Manejo de excepciones generales
-            return response()->json(['error' => 'Ocurrió un error al procesar la solicitud.'], 500); // Usar el código 500 directamente
+            // Manejo de otras excepciones
+            return response()->json(['error' => 'Ocurrió un error al procesar la solicitud: ' . $e->getMessage()], JsonResponse::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }
