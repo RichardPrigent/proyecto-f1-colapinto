@@ -5,8 +5,9 @@ namespace App\Services;
 use App\Contracts\HttpClientInterface;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Http\Exceptions\HttpResponseException;
-use Illuminate\Http\JsonResponse; // Importamos JsonResponse
+use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
+use App\Mappers\RaceScheduleMapper;
 
 /**
  * Clase RaceScheduleService
@@ -21,23 +22,37 @@ class RaceScheduleService
 {
     private string $apiUrl;
     private HttpClientInterface $httpClient;
+    private RaceScheduleMapper $raceScheduleMapper; // Agregamos el mapper
 
-    public function __construct(HttpClientInterface $httpClient)
+    public function __construct(HttpClientInterface $httpClient, RaceScheduleMapper $raceScheduleMapper)
     {
         $this->apiUrl = env('ERGAST_API_URL');
         $this->httpClient = $httpClient;
+        $this->raceScheduleMapper = $raceScheduleMapper;
     }
 
     /**
-     * Obtiene el calendario de carreras.
+     * Obtiene el calendario de carreras y lo formatea con el mapper.
      *
-     * Este método realiza una llamada a la API externa y devuelve el calendario de carreras.
+     * Este método realiza una llamada a la API externa y devuelve el calendario de carreras formateado.
      * Utiliza caché para almacenar los datos durante 30 minutos.
      *
-     * @return array Datos del calendario de carreras.
+     * @return array Datos del calendario de carreras formateados.
      * @throws HttpResponseException Si la respuesta de la API no es exitosa.
      */
     public function getRaceSchedule(): array
+    {
+        $rawData = $this->getRawRaceSchedule(); // Obtiene los datos crudos
+        return $this->raceScheduleMapper->map($rawData); // Aplica el mapper para formatear los datos
+    }
+
+    /**
+     * Obtiene los datos crudos del calendario de carreras desde la API externa.
+     *
+     * @return array Datos crudos del calendario de carreras.
+     * @throws HttpResponseException Si la respuesta de la API no es exitosa.
+     */
+    public function getRawRaceSchedule(): array
     {
         $cacheKey = 'race_schedule';
         return Cache::remember($cacheKey, 1800, function () {
@@ -45,7 +60,6 @@ class RaceScheduleService
 
             // Verifica si la respuesta fue exitosa
             if (!$response->successful()) {
-                // Lanza una excepción utilizando la clase JsonResponse ya importada
                 throw new HttpResponseException(
                     new JsonResponse(
                         ['error' => 'Error al obtener datos de la API: ' . $response->body()],

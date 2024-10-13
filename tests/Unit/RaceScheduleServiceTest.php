@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Services\RaceScheduleService;
 use App\Contracts\HttpClientInterface;
+use App\Mappers\RaceScheduleMapper;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Tests\TestCase;
@@ -27,24 +28,33 @@ class RaceScheduleServiceTest extends TestCase
     public function testGetRaceScheduleReturnsDataFromCache()
     {
         $httpClientMock = Mockery::mock(HttpClientInterface::class);
+        $raceScheduleMapperMock = Mockery::mock(RaceScheduleMapper::class);
         $cacheData = ['race' => 'data'];
+        $mappedData = ['mapped' => 'data'];
 
         Cache::shouldReceive('remember')
             ->once()
             ->with('race_schedule', 1800, Mockery::type('Closure'))
             ->andReturn($cacheData); // Simular que los datos vienen de la caché
 
-        $service = new RaceScheduleService($httpClientMock instanceof HttpClientInterface ? $httpClientMock : null);
+        $raceScheduleMapperMock->shouldReceive('map')
+            ->once()
+            ->with($cacheData)
+            ->andReturn($mappedData); // Simular el mapeo de los datos
+
+        $service = new RaceScheduleService($httpClientMock instanceof HttpClientInterface ? $httpClientMock : null, $raceScheduleMapperMock instanceof RaceScheduleMapper ? $raceScheduleMapperMock : null);
         $result = $service->getRaceSchedule();
 
-        $this->assertEquals($cacheData, $result); // Verificar que los datos de la caché son correctos
+        $this->assertEquals($mappedData, $result); // Verificar que los datos mapeados son correctos
     }
 
     public function testGetRaceScheduleFetchesDataFromApi()
     {
         $httpClientMock = Mockery::mock(HttpClientInterface::class);
+        $raceScheduleMapperMock = Mockery::mock(RaceScheduleMapper::class);
         $apiResponse = Mockery::mock();
         $apiData = ['race' => 'data'];
+        $mappedData = ['mapped' => 'data'];
 
         $apiResponse->shouldReceive('successful')
             ->once()
@@ -68,10 +78,15 @@ class RaceScheduleServiceTest extends TestCase
                 return $callback(); // Ejecutar el callback para obtener los datos de la API
             });
 
-        $service = new RaceScheduleService($httpClientMock instanceof HttpClientInterface ? $httpClientMock : null);
+        $raceScheduleMapperMock->shouldReceive('map')
+            ->once()
+            ->with($apiData)
+            ->andReturn($mappedData); // Simular el mapeo de los datos
+
+        $service = new RaceScheduleService($httpClientMock instanceof HttpClientInterface ? $httpClientMock : null, $raceScheduleMapperMock instanceof RaceScheduleMapper ? $raceScheduleMapperMock : null);
         $result = $service->getRaceSchedule();
 
-        $this->assertEquals($apiData, $result); // Verificar que los datos de la API son correctos
+        $this->assertEquals($mappedData, $result); // Verificar que los datos mapeados son correctos
     }
 
     public function testGetRaceScheduleThrowsExceptionOnApiError()
@@ -79,6 +94,7 @@ class RaceScheduleServiceTest extends TestCase
         $this->expectException(HttpResponseException::class); // Esperar una excepción si la API falla
 
         $httpClientMock = Mockery::mock(HttpClientInterface::class);
+        $raceScheduleMapperMock = Mockery::mock(RaceScheduleMapper::class);
         $apiResponse = Mockery::mock();
 
         $apiResponse->shouldReceive('successful')
@@ -103,7 +119,7 @@ class RaceScheduleServiceTest extends TestCase
                 return $callback(); // Ejecutar el callback para obtener los datos de la API
             });
 
-        $service = new RaceScheduleService($httpClientMock instanceof HttpClientInterface ? $httpClientMock : null);
+        $service = new RaceScheduleService($httpClientMock instanceof HttpClientInterface ? $httpClientMock : null, $raceScheduleMapperMock instanceof RaceScheduleMapper ? $raceScheduleMapperMock : null);
         $service->getRaceSchedule(); // Llamar al método que debería lanzar la excepción
     }
 }

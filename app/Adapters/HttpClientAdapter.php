@@ -12,6 +12,19 @@ use Illuminate\Validation\ValidationException;
 
 class HttpClientAdapter implements HttpClientInterface
 {
+    /**
+     * Envía una solicitud GET a la URL especificada.
+     *
+     * Este método valida la URL proporcionada y registra el proceso de solicitud.
+     * Reintenta la solicitud hasta 3 veces con un retraso de 100ms entre intentos.
+     * Si la solicitud es exitosa, devuelve la respuesta HTTP.
+     * Si la solicitud falla, registra el error y lanza una excepción apropiada.
+     *
+     * @param string $url La URL a la que se enviará la solicitud GET.
+     * @throws \Illuminate\Validation\ValidationException Si la URL proporcionada no es válida.
+     * @throws \Illuminate\Http\Exceptions\HttpResponseException Si la solicitud HTTP falla o la respuesta no es exitosa.
+     * @return \Illuminate\Http\Client\Response La respuesta HTTP si la solicitud es exitosa.
+     */
     public function get(string $url)
     {
         if (!filter_var($url, FILTER_VALIDATE_URL)) {
