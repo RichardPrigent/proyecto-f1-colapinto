@@ -1,0 +1,137 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Franco Colapinto API",
+        "description": "API para gestionar información sobre la Fórmula 1, incluyendo cronogramas de carreras, pilotos y equipos, con un enfoque especial en Franco Colapinto.",
+        "version": "1.0.0"
+    },
+    "paths": {
+        "/api/race-schedule": {
+            "get": {
+                "tags": [
+                    "Race Schedule"
+                ],
+                "summary": "Obtiene el cronograma de carreras",
+                "operationId": "66a61f2ae02955c83cd4abe244181592",
+                "responses": {
+                    "200": {
+                        "description": "Lista del cronograma de carreras",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "series": {
+                                            "type": "string",
+                                            "example": "f1"
+                                        },
+                                        "limit": {
+                                            "type": "string",
+                                            "example": "30"
+                                        },
+                                        "offset": {
+                                            "type": "string",
+                                            "example": "0"
+                                        },
+                                        "total": {
+                                            "type": "string",
+                                            "example": "24"
+                                        },
+                                        "RaceTable": {
+                                            "properties": {
+                                                "season": {
+                                                    "type": "string",
+                                                    "example": "2024"
+                                                },
+                                                "Races": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "season": {
+                                                                "type": "string",
+                                                                "example": "2024"
+                                                            },
+                                                            "round": {
+                                                                "type": "string",
+                                                                "example": "1"
+                                                            },
+                                                            "raceName": {
+                                                                "type": "string",
+                                                                "example": "Bahrain Grand Prix"
+                                                            },
+                                                            "Circuit": {
+                                                                "properties": {
+                                                                    "circuitId": {
+                                                                        "type": "string",
+                                                                        "example": "bahrain"
+                                                                    },
+                                                                    "circuitName": {
+                                                                        "type": "string",
+                                                                        "example": "Bahrain International Circuit"
+                                                                    }
+                                                                },
+                                                                "type": "object"
+                                                            },
+                                                            "date": {
+                                                                "type": "string",
+                                                                "example": "2024-03-02"
+                                                            },
+                                                            "time": {
+                                                                "type": "string",
+                                                                "example": "15:00:00Z"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Ocurrió un error HTTP",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Ocurrió un error HTTP"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Ocurrió un error al procesar la solicitud",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Ocurrió un error al procesar la solicitud: Detalles del error"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Race Schedule",
+            "description": "Race Schedule"
+        }
+    ]
+}
